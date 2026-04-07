@@ -1,0 +1,97 @@
+SELECT * FROM churn_analysis.synthetic_customer_behavior_and_churn;
+rename table synthetic_customer_behavior_and_churn to customer_data;
+CREATE TABLE customer_data_backup AS
+SELECT * FROM customer_data;
+
+SELECT COUNT(*) FROM customer_data_backup;
+
+DESCRIBE customer_data_backup;
+
+SELECT COUNT(*) FROM customer_data_backup;
+
+SELECT signup_date FROM customer_data_backup LIMIT 10;
+
+ALTER TABLE customer_data_backup
+ADD COLUMN signup_date_new DATE;
+
+set sql_safe_updates = 0;
+UPDATE customer_data_backup
+SET signup_date_new = STR_TO_DATE(signup_date, '%Y-%m-%d');
+
+SELECT
+COUNT(*) total_rows,
+SUM(customer_id IS NULL) missing_id,
+SUM(age IS NULL) missing_age,
+SUM(monthly_charges IS NULL) missing_charges,
+SUM(churn IS NULL) missing_churn
+FROM customer_data_backup;
+
+SELECT customer_id, COUNT(*)
+FROM customer_data_backup
+GROUP BY customer_id
+HAVING COUNT(*) > 1;
+
+
+SELECT
+ROUND(AVG(churn)*100,2) AS churn_rate_percent
+FROM customer_data_backup;
+
+SELECT churn, COUNT(*) customers
+FROM customer_data_backup
+GROUP BY churn;
+
+SELECT
+churn,
+ROUND(AVG(monthly_charges),2) avg_monthly,
+ROUND(AVG(total_charges),2) avg_total
+FROM customer_data_backup
+GROUP BY churn;
+
+SELECT
+    usage_frequency,
+    contract_type,
+    AVG(churn) * 100 AS churn_percentage
+FROM customer_data_backup
+GROUP BY usage_frequency, contract_type
+ORDER BY churn_percentage DESC;
+
+
+SELECT
+    churn,
+    ROUND(AVG(total_charges),2) AS avg_total_spent,
+    ROUND(AVG(tenure_months),2) AS avg_tenure
+FROM customer_data_backup
+GROUP BY churn;
+
+
+SELECT
+    CASE
+        WHEN satisfaction_score <= 3 THEN 'Low Satisfaction'
+        WHEN satisfaction_score <= 7 THEN 'Medium Satisfaction'
+        ELSE 'High Satisfaction'
+    END AS satisfaction_group,
+    ROUND(AVG(churn)*100,2) AS churn_rate
+FROM customer_data_backup
+GROUP BY satisfaction_group
+ORDER BY churn_rate DESC;
+
+
+SELECT
+    SUM(total_charges) AS total_revenue,
+    SUM(CASE WHEN churn = 1 THEN total_charges ELSE 0 END) AS lost_revenue,
+    ROUND(
+        SUM(CASE WHEN churn = 1 THEN total_charges ELSE 0 END) /
+        SUM(total_charges) * 100, 2
+    ) AS revenue_loss_percent
+FROM customer_data_backup;
+
+SELECT *
+FROM (
+    SELECT
+        customer_id,
+        total_charges,
+        RANK() OVER (ORDER BY total_charges DESC) AS customer_rank
+    FROM customer_data_backup
+) ranked
+WHERE customer_rank <= 10;
+
